@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e9f6e">
+<title>Split Bill</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="app-header">
+  <input id="bill-title" class="title-input" type="text" autocomplete="off" aria-label="Bill title">
+  <select id="currency-select" class="currency-select" aria-label="Currency">
+    <option>HKD</option>
+    <option>USD</option>
+    <option>TWD</option>
+    <option>CNY</option>
+    <option>JPY</option>
+    <option>EUR</option>
+    <option>GBP</option>
+    <option>SGD</option>
+    <option>AUD</option>
+  </select>
+  <button id="btn-history" class="icon-btn" aria-label="My bills" title="My bills">🗂️</button>
+</header>
+
+<main>
+  <section>
+    <h2>People</h2>
+    <div id="people-list" class="chips"></div>
+    <button id="btn-add-person" class="btn secondary full">＋ Add person</button>
+  </section>
+
+  <section>
+    <h2>Items</h2>
+    <div id="items-list" class="items"></div>
+    <button id="btn-add-item" class="btn secondary full">＋ Add item</button>
+  </section>
+
+  <section id="summary-section">
+    <h2>Summary</h2>
+    <div id="summary-content"></div>
+    <h2 id="transfers-heading">Who pays whom</h2>
+    <div id="transfers-list"></div>
+  </section>
+</main>
+
+<footer class="bottom-bar">
+  <button id="btn-share" class="btn primary big">Share bill</button>
+</footer>
+
+<dialog id="person-dialog">
+  <form id="person-form" novalidate>
+    <h3 id="person-dialog-heading">Add person</h3>
+    <label>Name
+      <input id="person-name" type="text" autocomplete="off" placeholder="e.g. Alvin">
+    </label>
+    <label>PayMe link <span class="optional">(optional)</span>
+      <input id="person-paylink" type="text" autocomplete="off" placeholder="payme.hsbc/yourname" inputmode="url">
+    </label>
+    <p class="hint">Add a PayMe PayLink so friends can pay this person in one tap.</p>
+    <div class="dialog-actions">
+      <button type="button" id="person-delete" class="btn danger hidden">Delete</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="item-dialog">
+  <form id="item-form" novalidate>
+    <h3 id="item-dialog-heading">Add item</h3>
+    <label>Description
+      <input id="item-desc" type="text" autocomplete="off" placeholder="e.g. Dinner">
+    </label>
+    <label>Amount
+      <input id="item-amount" type="text" autocomplete="off" inputmode="decimal" placeholder="0.00">
+    </label>
+    <label for="item-paidby">Paid by</label>
+    <select id="item-paidby"></select>
+    <label>Split between</label>
+    <div id="item-sharedby" class="chips"></div>
+    <div class="dialog-actions">
+      <button type="button" id="item-delete" class="btn danger hidden">Delete</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="share-dialog">
+  <h3>Share bill</h3>
+  <p class="hint">Anyone who opens this link sees the bill and can add what they paid, then share an updated link back to you.</p>
+  <div id="share-link-preview" class="share-link"></div>
+  <div class="dialog-actions column">
+    <button id="share-native" class="btn primary full">Share…</button>
+    <a id="share-whatsapp" class="btn whatsapp full" target="_blank" rel="noopener">Send via WhatsApp</a>
+    <button id="share-copy" class="btn secondary full">Copy link</button>
+    <button class="btn ghost full" data-close>Close</button>
+  </div>
+</dialog>
+
+<dialog id="history-dialog">
+  <h3>My bills</h3>
+  <div id="history-list" class="history-list"></div>
+  <div class="dialog-actions column">
+    <button id="btn-new-bill" class="btn primary full">＋ New bill</button>
+    <button class="btn ghost full" data-close>Close</button>
+  </div>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="logic.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

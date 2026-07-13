@@ -1,0 +1,502 @@
+/* Split Bill — UI layer. Pure calculations live in logic.js (SplitLogic). */
+(function () {
+  'use strict';
+
+  const L = window.SplitLogic;
+  const $ = (id) => document.getElementById(id);
+
+  const LS_BILLS = 'splitbill.bills.v1';
+  const LS_CURRENT = 'splitbill.currentId';
+  const LS_MY_PAYLINK = 'splitbill.myPayLink';
+
+  let bill = null;
+  let editingPersonId = null; // null = adding
+  let editingItemId = null; // null = adding
+  let dialogShared = new Set(); // sharedBy selection inside the item dialog
+
+  /* ---------- Storage ---------- */
+
+  function loadBills() {
+    try {
+      return JSON.parse(localStorage.getItem(LS_BILLS)) || {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveBill() {
+    bill.updatedAt = Date.now();
+    const bills = loadBills();
+    bills[bill.id] = bill;
+    try {
+      localStorage.setItem(LS_BILLS, JSON.stringify(bills));
+      localStorage.setItem(LS_CURRENT, bill.id);
+    } catch (e) {
+      /* storage full/unavailable — app still works in memory */
+    }
+  }
+
+  function defaultTitle() {
+    const d = new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    return 'Bill ' + d;
+  }
+
+  function newBill() {
+    return {
+      v: 1,
+      id: L.newId(),
+      title: defaultTitle(),
+      currency: 'HKD',
+      people: [],
+      items: [],
+      updatedAt: Date.now(),
+    };
+  }
+
+  /* ---------- Helpers ---------- */
+
+  function fmt(cents) {
+    return L.formatMoney(cents, bill.currency);
+  }
+
+  function personById(id) {
+    return bill.people.find((p) => p.id === id);
+  }
+
+  function personName(id) {
+    const p = personById(id);
+    return p ? p.name : '?';
+  }
+
+  function normalizePayLink(link) {
+    if (!link) return '';
+    link = link.trim();
+    if (!link) return '';
+    if (!/^https?:\/\//i.test(link)) link = 'https://' + link;
+    return link;
+  }
+
+  let toastTimer = null;
+  function toast(msg) {
+    const el = $('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  }
+
+  function shareText(text) {
+    if (navigator.share) {
+      navigator.share({ text }).catch(() => {});
+    } else {
+      window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+    }
+  }
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  /* ---------- Rendering ---------- */
+
+  function render() {
+    $('bill-title').value = bill.title;
+    const sel = $('currency-select');
+    if (![...sel.options].some((o) => o.value === bill.currency)) {
+      sel.appendChild(new Option(bill.currency, bill.currency));
+    }
+    sel.value = bill.currency;
+    renderPeople();
+    renderItems();
+    renderSummary();
+  }
+
+  function renderPeople() {
+    const wrap = $('people-list');
+    wrap.textContent = '';
+    for (const p of bill.people) {
+      const chip = el('button', 'chip', p.name);
+      chip.type = 'button';
+      if (p.payLink) chip.appendChild(el('span', 'paylink-mark', '💳'));
+      chip.addEventListener('click', () => openPersonDialog(p.id));
+      wrap.appendChild(chip);
+    }
+  }
+
+  function renderItems() {
+    const wrap = $('items-list');
+    wrap.textContent = '';
+    if (bill.items.length === 0) {
+      wrap.appendChild(el('p', 'empty-note', 'No items yet. Add what was paid, item by item.'));
+      return;
+    }
+    for (const item of bill.items) {
+      const card = el('button', 'item-card');
+      card.type = 'button';
+      const main = el('div', 'item-main');
+      main.appendChild(el('div', 'item-desc', item.desc));
+      const n = item.sharedBy.length;
+      const meta = 'Paid by ' + personName(item.paidBy) + ' · split ' + (n === 1 ? 'by 1 person' : n + ' ways');
+      main.appendChild(el('div', 'item-meta', meta));
+      card.appendChild(main);
+      card.appendChild(el('div', 'item-amount', fmt(item.amountCents)));
+      card.addEventListener('click', () => openItemDialog(item.id));
+      wrap.appendChild(card);
+    }
+  }
+
+  function renderSummary() {
+    const summary = $('summary-content');
+    const transfersWrap = $('transfers-list');
+    summary.textContent = '';
+    transfersWrap.textContent = '';
+
+    if (bill.people.length === 0 || bill.items.length === 0) {
+      summary.appendChild(el('p', 'empty-note', 'Add people and items to see who owes what.'));
+      $('transfers-heading').classList.add('hidden');
+      return;
+    }
+    $('transfers-heading').classList.remove('hidden');
+
+    const balances = L.computeBalances(bill);
+
+    const table = el('table', 'summary-table');
+    const thead = el('thead');
+    const hr = el('tr');
+    for (const h of ['Person', 'Paid', 'Share', 'Net']) hr.appendChild(el('th', '', h));
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    const tbody = el('tbody');
+    for (const p of bill.people) {
+      const b = balances[p.id];
+      const tr = el('tr');
+      tr.appendChild(el('td', '', p.name));
+      tr.appendChild(el('td', '', fmt(b.paidCents)));
+      tr.appendChild(el('td', '', fmt(b.owedCents)));
+      const netTd = el('td', b.netCents > 0 ? 'net-pos' : b.netCents < 0 ? 'net-neg' : '',
+        (b.netCents > 0 ? '+' : '') + fmt(b.netCents));
+      tr.appendChild(netTd);
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    summary.appendChild(table);
+
+    const transfers = L.settle(balances);
+    if (transfers.length === 0) {
+      transfersWrap.appendChild(el('div', 'all-settled', 'All settled — nobody owes anything 🎉'));
+      return;
+    }
+    for (const t of transfers) {
+      const row = el('div', 'transfer-row');
+      const who = el('div', 'transfer-who');
+      who.appendChild(document.createTextNode(personName(t.from)));
+      who.appendChild(el('span', 'arr', '→'));
+      who.appendChild(document.createTextNode(personName(t.to)));
+      row.appendChild(who);
+      row.appendChild(el('div', 'transfer-amount', fmt(t.amountCents)));
+      const btn = el('button', 'btn small primary', 'Request');
+      btn.type = 'button';
+      btn.addEventListener('click', () => requestPayment(t));
+      row.appendChild(btn);
+      transfersWrap.appendChild(row);
+
+      const payee = personById(t.to);
+      if (payee && !payee.payLink) {
+        transfersWrap.appendChild(el('p', 'transfer-hint',
+          'Tip: tap "' + payee.name + '" above and add their PayMe link to include it in the request.'));
+      }
+    }
+  }
+
+  /* ---------- PayMe / sharing ---------- */
+
+  function requestPayment(t) {
+    const from = personById(t.from);
+    const to = personById(t.to);
+    if (!from || !to) return;
+    let text = from.name + ', you owe ' + to.name + ' ' + fmt(t.amountCents) + ' for "' + bill.title + '"';
+    const link = normalizePayLink(to.payLink);
+    if (link) text += ' → Pay here: ' + link;
+    shareText(text);
+  }
+
+  async function openShareDialog() {
+    const payload = await L.encodeBill(bill);
+    const base = location.href.split('#')[0];
+    const url = base + '#b=' + payload;
+    const text = 'Split bill "' + bill.title + '" — open this link to see the bill or add what you paid:\n' + url;
+
+    $('share-link-preview').textContent = url;
+    const nativeBtn = $('share-native');
+    nativeBtn.classList.toggle('hidden', !navigator.share);
+    nativeBtn.onclick = () => {
+      navigator.share({ text }).catch(() => {});
+    };
+    $('share-whatsapp').href = 'https://wa.me/?text=' + encodeURIComponent(text);
+    $('share-copy').onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(url);
+        toast('Link copied');
+      } catch (e) {
+        toast('Could not copy — long-press the link to copy it');
+      }
+    };
+    $('share-dialog').showModal();
+  }
+
+  /* ---------- Person dialog ---------- */
+
+  function openPersonDialog(personId) {
+    editingPersonId = personId || null;
+    const p = personId ? personById(personId) : null;
+    $('person-dialog-heading').textContent = p ? 'Edit person' : 'Add person';
+    $('person-name').value = p ? p.name : '';
+    // First person on this device: prefill their remembered PayLink.
+    const prefill = !p && bill.people.length === 0 ? localStorage.getItem(LS_MY_PAYLINK) || '' : '';
+    $('person-paylink').value = p ? p.payLink || '' : prefill;
+    $('person-delete').classList.toggle('hidden', !p);
+    $('person-dialog').showModal();
+    if (!p) $('person-name').focus();
+  }
+
+  function savePerson(e) {
+    e.preventDefault();
+    const name = $('person-name').value.trim();
+    const payLink = $('person-paylink').value.trim();
+    if (!name) {
+      toast('Please enter a name');
+      return;
+    }
+    if (editingPersonId) {
+      const p = personById(editingPersonId);
+      p.name = name;
+      p.payLink = payLink;
+    } else {
+      if (bill.people.length === 0 && payLink) {
+        try { localStorage.setItem(LS_MY_PAYLINK, payLink); } catch (err) { /* ignore */ }
+      }
+      bill.people.push({ id: L.newId(), name, payLink });
+    }
+    $('person-dialog').close();
+    saveBill();
+    render();
+  }
+
+  function deletePerson() {
+    const id = editingPersonId;
+    const used = bill.items.some((it) => it.paidBy === id || it.sharedBy.includes(id));
+    if (used) {
+      toast('This person is on some items — edit those items first');
+      return;
+    }
+    bill.people = bill.people.filter((p) => p.id !== id);
+    $('person-dialog').close();
+    saveBill();
+    render();
+  }
+
+  /* ---------- Item dialog ---------- */
+
+  function openItemDialog(itemId) {
+    if (bill.people.length === 0) {
+      toast('Add at least one person first');
+      openPersonDialog(null);
+      return;
+    }
+    editingItemId = itemId || null;
+    const item = itemId ? bill.items.find((i) => i.id === itemId) : null;
+    $('item-dialog-heading').textContent = item ? 'Edit item' : 'Add item';
+    $('item-desc').value = item ? item.desc : '';
+    $('item-amount').value = item ? (item.amountCents / 100).toFixed(2).replace(/\.00$/, '') : '';
+    $('item-delete').classList.toggle('hidden', !item);
+
+    const paidBySel = $('item-paidby');
+    paidBySel.textContent = '';
+    for (const p of bill.people) paidBySel.appendChild(new Option(p.name, p.id));
+    paidBySel.value = item ? item.paidBy : bill.people[0].id;
+
+    dialogShared = new Set(item ? item.sharedBy : bill.people.map((p) => p.id));
+    renderSharedChips();
+
+    $('item-dialog').showModal();
+    if (!item) $('item-desc').focus();
+  }
+
+  function renderSharedChips() {
+    const wrap = $('item-sharedby');
+    wrap.textContent = '';
+    for (const p of bill.people) {
+      const chip = el('button', 'chip toggle', p.name);
+      chip.type = 'button';
+      chip.setAttribute('aria-pressed', dialogShared.has(p.id) ? 'true' : 'false');
+      chip.addEventListener('click', () => {
+        if (dialogShared.has(p.id)) dialogShared.delete(p.id);
+        else dialogShared.add(p.id);
+        chip.setAttribute('aria-pressed', dialogShared.has(p.id) ? 'true' : 'false');
+      });
+      wrap.appendChild(chip);
+    }
+  }
+
+  function saveItem(e) {
+    e.preventDefault();
+    const desc = $('item-desc').value.trim() || 'Item';
+    const amountCents = L.parseAmountToCents($('item-amount').value);
+    if (amountCents === null || amountCents <= 0) {
+      toast('Please enter a valid amount');
+      $('item-amount').focus();
+      return;
+    }
+    if (dialogShared.size === 0) {
+      toast('Pick at least one person to split between');
+      return;
+    }
+    const paidBy = $('item-paidby').value;
+    const sharedBy = bill.people.filter((p) => dialogShared.has(p.id)).map((p) => p.id);
+    if (editingItemId) {
+      const item = bill.items.find((i) => i.id === editingItemId);
+      Object.assign(item, { desc, amountCents, paidBy, sharedBy });
+    } else {
+      bill.items.push({ id: L.newId(), desc, amountCents, paidBy, sharedBy });
+    }
+    $('item-dialog').close();
+    saveBill();
+    render();
+  }
+
+  function deleteItem() {
+    bill.items = bill.items.filter((i) => i.id !== editingItemId);
+    $('item-dialog').close();
+    saveBill();
+    render();
+  }
+
+  /* ---------- History ---------- */
+
+  function openHistoryDialog() {
+    const wrap = $('history-list');
+    wrap.textContent = '';
+    const bills = Object.values(loadBills()).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    if (bills.length === 0) wrap.appendChild(el('p', 'empty-note', 'No saved bills yet.'));
+    for (const b of bills) {
+      const row = el('button', 'history-row' + (b.id === bill.id ? ' current' : ''));
+      row.type = 'button';
+      const main = el('div', 'history-main');
+      main.appendChild(el('div', 'history-title', b.title));
+      const total = (b.items || []).reduce((s, i) => s + i.amountCents, 0);
+      const date = new Date(b.updatedAt || 0).toLocaleDateString();
+      main.appendChild(el('div', 'history-meta',
+        date + ' · ' + (b.people || []).length + ' people · ' + L.formatMoney(total, b.currency || 'HKD')));
+      row.appendChild(main);
+      const del = el('button', 'history-delete', '🗑');
+      del.type = 'button';
+      del.setAttribute('aria-label', 'Delete bill');
+      del.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!confirm('Delete bill "' + b.title + '"?')) return;
+        const all = loadBills();
+        delete all[b.id];
+        localStorage.setItem(LS_BILLS, JSON.stringify(all));
+        if (b.id === bill.id) {
+          bill = newBill();
+          saveBill();
+          render();
+        }
+        openHistoryDialog();
+      });
+      row.appendChild(del);
+      row.addEventListener('click', () => {
+        bill = b;
+        localStorage.setItem(LS_CURRENT, bill.id);
+        $('history-dialog').close();
+        render();
+      });
+      wrap.appendChild(row);
+    }
+  }
+
+  /* ---------- Events / init ---------- */
+
+  function bindEvents() {
+    $('bill-title').addEventListener('change', () => {
+      bill.title = $('bill-title').value.trim() || defaultTitle();
+      $('bill-title').value = bill.title;
+      saveBill();
+    });
+    $('currency-select').addEventListener('change', () => {
+      bill.currency = $('currency-select').value;
+      saveBill();
+      render();
+    });
+    $('btn-add-person').addEventListener('click', () => openPersonDialog(null));
+    $('btn-add-item').addEventListener('click', () => openItemDialog(null));
+    $('btn-share').addEventListener('click', openShareDialog);
+    $('btn-history').addEventListener('click', () => {
+      openHistoryDialog();
+      $('history-dialog').showModal();
+    });
+    $('btn-new-bill').addEventListener('click', () => {
+      bill = newBill();
+      saveBill();
+      $('history-dialog').close();
+      render();
+    });
+    $('person-form').addEventListener('submit', savePerson);
+    $('person-delete').addEventListener('click', deletePerson);
+    $('item-form').addEventListener('submit', saveItem);
+    $('item-delete').addEventListener('click', deleteItem);
+
+    document.querySelectorAll('[data-close]').forEach((btn) => {
+      btn.addEventListener('click', () => btn.closest('dialog').close());
+    });
+    // Tap outside a dialog to close it.
+    document.querySelectorAll('dialog').forEach((d) => {
+      d.addEventListener('click', (e) => {
+        if (e.target === d) d.close();
+      });
+    });
+  }
+
+  // Returns true if the URL hash held a valid shared bill and it was loaded.
+  async function loadFromHash() {
+    const m = location.hash.match(/^#b=(.+)$/);
+    if (!m) return false;
+    try {
+      const loaded = await L.decodeBill(decodeURIComponent(m[1]));
+      if (!loaded.id) loaded.id = L.newId();
+      bill = loaded;
+      saveBill();
+      history.replaceState(null, '', location.pathname + location.search);
+      toast('Bill loaded from link');
+      return true;
+    } catch (e) {
+      toast('Could not read that bill link');
+      return false;
+    }
+  }
+
+  async function init() {
+    await loadFromHash();
+    if (!bill) {
+      const bills = loadBills();
+      const currentId = localStorage.getItem(LS_CURRENT);
+      bill = (currentId && bills[currentId]) || newBill();
+    }
+    bindEvents();
+    render();
+
+    // Opening a shared link while the app is already open only changes the
+    // hash (same-document navigation), so handle it here too.
+    window.addEventListener('hashchange', async () => {
+      if (await loadFromHash()) {
+        document.querySelectorAll('dialog[open]').forEach((d) => d.close());
+        render();
+      }
+    });
+  }
+
+  init();
+})();

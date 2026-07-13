@@ -1,0 +1,76 @@
+- generic [ref=e1]:
+  - banner [ref=e2]:
+    - textbox "Bill title" [ref=e3]: Bill Jul 13
+    - combobox "Currency" [ref=e4]:
+      - option "HKD" [selected]
+      - option "USD"
+      - option "TWD"
+      - option "CNY"
+      - option "JPY"
+      - option "EUR"
+      - option "GBP"
+      - option "SGD"
+      - option "AUD"
+    - button "My bills" [ref=e5] [cursor=pointer]: 🗂️
+  - main [ref=e6]:
+    - generic [ref=e7]:
+      - heading "People" [level=2] [ref=e8]
+      - generic [ref=e32]:
+        - button "Alvin 💳" [ref=e110] [cursor=pointer]:
+          - text: Alvin
+          - generic [ref=e111]: 💳
+        - button "Bob" [ref=e112] [cursor=pointer]
+        - button "Carol" [ref=e113] [cursor=pointer]
+      - button "＋ Add person" [ref=e9] [cursor=pointer]
+    - generic [ref=e10]:
+      - heading "Items" [level=2] [ref=e11]
+      - generic [ref=e12]:
+        - button "Dinner Paid by Alvin · split 3 ways HK$600.00" [ref=e114] [cursor=pointer]:
+          - generic [ref=e115]:
+            - generic [ref=e116]: Dinner
+            - generic [ref=e117]: Paid by Alvin · split 3 ways
+          - generic [ref=e118]: HK$600.00
+        - button "Drinks Paid by Bob · split 2 ways HK$200.00" [ref=e119] [cursor=pointer]:
+          - generic [ref=e120]:
+            - generic [ref=e121]: Drinks
+            - generic [ref=e122]: Paid by Bob · split 2 ways
+          - generic [ref=e123]: HK$200.00
+      - button "＋ Add item" [active] [ref=e14] [cursor=pointer]
+    - generic [ref=e15]:
+      - heading "Summary" [level=2] [ref=e16]
+      - table [ref=e124]:
+        - rowgroup [ref=e125]:
+          - row [ref=e126]:
+            - columnheader "Person" [ref=e127]
+            - columnheader "Paid" [ref=e128]
+            - columnheader "Share" [ref=e129]
+            - columnheader "Net" [ref=e130]
+        - rowgroup [ref=e131]:
+          - row [ref=e132]:
+            - cell "Alvin" [ref=e133]
+            - cell "HK$600.00" [ref=e134]
+            - cell "HK$300.00" [ref=e135]
+            - cell "+HK$300.00" [ref=e136]
+          - row [ref=e137]:
+            - cell "Bob" [ref=e138]
+            - cell "HK$200.00" [ref=e139]
+            - cell "HK$300.00" [ref=e140]
+            - cell "-HK$100.00" [ref=e141]
+          - row [ref=e142]:
+            - cell "Carol" [ref=e143]
+            - cell "HK$0.00" [ref=e144]
+            - cell "HK$200.00" [ref=e145]
+            - cell "-HK$200.00" [ref=e146]
+      - heading "Who pays whom" [level=2] [ref=e97]
+      - generic [ref=e98]:
+        - generic [ref=e147]:
+          - generic [ref=e148]: Carol→Alvin
+          - generic [ref=e149]: HK$200.00
+          - button "Request" [ref=e150] [cursor=pointer]
+        - generic [ref=e151]:
+          - generic [ref=e152]: Bob→Alvin
+          - generic [ref=e153]: HK$100.00
+          - button "Request" [ref=e154] [cursor=pointer]
+  - contentinfo [ref=e19]:
+    - button "Share bill" [ref=e20] [cursor=pointer]
+  - status

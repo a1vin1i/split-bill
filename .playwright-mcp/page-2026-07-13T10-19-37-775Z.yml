@@ -1,0 +1,58 @@
+- generic [ref=e1]:
+  - banner [ref=e2]:
+    - textbox "Bill title" [ref=e3]: Bill Jul 13
+    - combobox "Currency" [ref=e4]:
+      - option "HKD" [selected]
+      - option "USD"
+      - option "TWD"
+      - option "CNY"
+      - option "JPY"
+      - option "EUR"
+      - option "GBP"
+      - option "SGD"
+      - option "AUD"
+    - button "My bills" [ref=e5] [cursor=pointer]: 🗂️
+  - main [ref=e6]:
+    - generic [ref=e7]:
+      - heading "People" [level=2] [ref=e8]
+      - generic [ref=e32]:
+        - button "Alvin 💳" [ref=e42] [cursor=pointer]:
+          - text: Alvin
+          - generic [ref=e43]: 💳
+        - button "Bob" [ref=e44] [cursor=pointer]
+        - button "Carol" [ref=e45] [cursor=pointer]
+      - button "＋ Add person" [ref=e9] [cursor=pointer]
+    - generic [ref=e10]:
+      - heading "Items" [level=2] [ref=e11]
+      - paragraph [ref=e46]: No items yet. Add what was paid, item by item.
+      - button "＋ Add item" [ref=e14] [cursor=pointer]
+    - generic [ref=e15]:
+      - heading "Summary" [level=2] [ref=e16]
+      - paragraph [ref=e47]: Add people and items to see who owes what.
+  - contentinfo [ref=e19]:
+    - button "Share bill" [ref=e20] [cursor=pointer]
+  - dialog [ref=e48]:
+    - generic [ref=e49]:
+      - heading "Add item" [level=3] [ref=e50]
+      - generic [ref=e51]:
+        - text: Description
+        - textbox "Description" [active] [ref=e52]:
+          - /placeholder: e.g. Dinner
+      - generic [ref=e53]:
+        - text: Amount
+        - textbox "Amount" [ref=e54]:
+          - /placeholder: "0.00"
+      - generic [ref=e55]: Paid by
+      - combobox "Paid by" [ref=e56]:
+        - option "Alvin" [selected]
+        - option "Bob"
+        - option "Carol"
+      - generic [ref=e57]: Split between
+      - generic [ref=e58]:
+        - button "Alvin" [pressed] [ref=e59] [cursor=pointer]
+        - button "Bob" [pressed] [ref=e60] [cursor=pointer]
+        - button "Carol" [pressed] [ref=e61] [cursor=pointer]
+      - generic [ref=e62]:
+        - button "Cancel" [ref=e63] [cursor=pointer]
+        - button "Save" [ref=e64] [cursor=pointer]
+  - status
