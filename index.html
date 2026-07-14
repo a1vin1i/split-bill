@@ -23,6 +23,7 @@
     <option>SGD</option>
     <option>AUD</option>
   </select>
+  <button id="btn-people" class="icon-btn" aria-label="People / Families" title="People / Families">👥</button>
   <button id="btn-history" class="icon-btn" aria-label="My bills" title="My bills">🗂️</button>
 </header>
 
@@ -30,7 +31,7 @@
   <section>
     <h2>People</h2>
     <div id="people-list" class="chips"></div>
-    <button id="btn-add-person" class="btn secondary full">＋ Add person/family</button>
+    <button id="btn-add-person" class="btn secondary full">＋ Add people</button>
   </section>
 
   <section>
@@ -65,10 +66,12 @@
       </div>
     </label>
     <p class="hint">How many shares this person/family counts as — e.g. 2 for a couple, 0.5 for a child or half share.</p>
-    <label>PayMe link <span class="optional">(optional)</span>
+    <label for="person-paylink">PayMe link <span class="optional">(optional)</span></label>
+    <div class="input-row">
       <input id="person-paylink" type="text" autocomplete="off" placeholder="payme.hsbc/yourname" inputmode="url">
-    </label>
-    <p class="hint">Add a PayMe PayLink so friends can pay this person in one tap.</p>
+      <button type="button" id="paylink-paste" class="btn outline">📋 Paste</button>
+    </div>
+    <p class="hint">Add a PayMe PayLink so friends can pay this person in one tap. In PayMe: Receive → Share my PayLink, then tap Paste here.</p>
     <div class="dialog-actions">
       <button type="button" id="person-delete" class="btn danger hidden">Delete</button>
       <span class="spacer"></span>
@@ -98,6 +101,28 @@
       <button type="submit" class="btn primary">Save</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="picker-dialog">
+  <h3 tabindex="-1">Add people to this bill</h3>
+  <div id="picker-list" class="chips"></div>
+  <p id="picker-empty" class="hint hidden"></p>
+  <div class="dialog-actions">
+    <button type="button" id="picker-new" class="btn ghost">＋ New</button>
+    <span class="spacer"></span>
+    <button type="button" class="btn ghost" data-close>Cancel</button>
+    <button type="button" id="picker-add" class="btn primary">Add</button>
+  </div>
+</dialog>
+
+<dialog id="people-dialog">
+  <h3>People / Families</h3>
+  <p class="hint">Your saved people are available on every bill. Tap one to edit; removing someone here doesn't change existing bills.</p>
+  <div id="contacts-list" class="history-list"></div>
+  <div class="dialog-actions column">
+    <button type="button" id="contact-new" class="btn primary full">＋ New person/family</button>
+    <button type="button" class="btn ghost full" data-close>Close</button>
+  </div>
 </dialog>
 
 <dialog id="share-dialog">

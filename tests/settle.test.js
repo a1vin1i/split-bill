@@ -96,6 +96,23 @@ test('single payer, others owe them', () => {
   }
 });
 
+test('extractPayLink pulls the link out of PayMe share text', () => {
+  const shared = 'Tap to PayMe!\nhttps://payme.hsbc/e0b0fb916d6e4b26a5437b695d5dfd11';
+  assert.strictEqual(L.extractPayLink(shared), 'https://payme.hsbc/e0b0fb916d6e4b26a5437b695d5dfd11');
+  // Prefers the PayMe link over other URLs, strips trailing punctuation.
+  assert.strictEqual(
+    L.extractPayLink('see https://example.com then https://payme.hsbc/alvin!'),
+    'https://payme.hsbc/alvin'
+  );
+  assert.strictEqual(L.extractPayLink('https://example.com/pay'), 'https://example.com/pay');
+  // Bare link without scheme is accepted as-is.
+  assert.strictEqual(L.extractPayLink('payme.hsbc/alvin'), 'payme.hsbc/alvin');
+  // Prose without any URL is rejected.
+  assert.strictEqual(L.extractPayLink('Tap to PayMe!'), null);
+  assert.strictEqual(L.extractPayLink(''), null);
+  assert.strictEqual(L.extractPayLink(null), null);
+});
+
 test('normalizeHeadcount', () => {
   assert.strictEqual(L.normalizeHeadcount(2), 2);
   assert.strictEqual(L.normalizeHeadcount('2.5'), 2.5);

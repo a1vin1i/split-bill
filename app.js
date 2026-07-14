@@ -8,11 +8,15 @@
   const LS_BILLS = 'splitbill.bills.v1';
   const LS_CURRENT = 'splitbill.currentId';
   const LS_MY_PAYLINK = 'splitbill.myPayLink';
+  const LS_CONTACTS = 'splitbill.contacts.v1';
 
   let bill = null;
-  let editingPersonId = null; // null = adding
+  // Person dialog context: mode 'bill' edits this bill's copy, 'contact' edits
+  // the saved pool. id null = creating; addToBill also puts them on the bill.
+  let personCtx = { mode: 'contact', id: null, addToBill: false };
   let editingItemId = null; // null = adding
   let dialogShared = new Set(); // sharedBy selection inside the item dialog
+  let pickerSelected = new Set(); // contact selection inside the picker dialog
 
   /* ---------- Storage ---------- */
 
@@ -34,6 +38,40 @@
     } catch (e) {
       /* storage full/unavailable — app still works in memory */
     }
+  }
+
+  function loadContacts() {
+    try {
+      return JSON.parse(localStorage.getItem(LS_CONTACTS)) || [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveContacts(contacts) {
+    try {
+      localStorage.setItem(LS_CONTACTS, JSON.stringify(contacts));
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  // One-time bootstrap: build the pool from people already on saved bills.
+  function seedContactsIfNeeded() {
+    if (localStorage.getItem(LS_CONTACTS) !== null) return;
+    const seen = new Set();
+    const contacts = [];
+    const bills = Object.values(loadBills()).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    for (const b of bills) {
+      for (const p of b.people || []) {
+        const nameKey = p.name.trim().toLowerCase();
+        if (seen.has(p.id) || seen.has(nameKey)) continue;
+        seen.add(p.id);
+        seen.add(nameKey);
+        contacts.push({ id: p.id, name: p.name, payLink: p.payLink || '', headcount: L.normalizeHeadcount(p.headcount) });
+      }
+    }
+    saveContacts(contacts);
   }
 
   function defaultTitle() {
@@ -148,7 +186,7 @@
       const chip = el('button', 'chip', personLabel(p));
       chip.type = 'button';
       if (p.payLink) chip.appendChild(el('span', 'paylink-mark', '💳'));
-      chip.addEventListener('click', () => openPersonDialog(p.id));
+      chip.addEventListener('click', () => openPersonDialog({ mode: 'bill', id: p.id }));
       wrap.appendChild(chip);
     }
   }
@@ -296,16 +334,21 @@
 
   /* ---------- Person dialog ---------- */
 
-  function openPersonDialog(personId) {
-    editingPersonId = personId || null;
-    const p = personId ? personById(personId) : null;
+  function openPersonDialog(ctx) {
+    personCtx = ctx;
+    let p = null;
+    if (ctx.id) {
+      p = ctx.mode === 'contact' ? loadContacts().find((c) => c.id === ctx.id) : personById(ctx.id);
+    }
     $('person-dialog-heading').textContent = p ? 'Edit person/family' : 'Add person/family';
     $('person-name').value = p ? p.name : '';
     $('person-headcount').value = formatHeadcount(p ? headcountOf(p) : 1);
-    // First person on this device: prefill their remembered PayLink.
-    const prefill = !p && bill.people.length === 0 ? localStorage.getItem(LS_MY_PAYLINK) || '' : '';
+    // First person ever on this device: prefill their remembered PayLink.
+    const prefill = !p && loadContacts().length === 0 ? localStorage.getItem(LS_MY_PAYLINK) || '' : '';
     $('person-paylink').value = p ? p.payLink || '' : prefill;
-    $('person-delete').classList.toggle('hidden', !p);
+    const del = $('person-delete');
+    del.classList.toggle('hidden', !p);
+    del.textContent = ctx.mode === 'bill' ? 'Remove' : 'Delete';
     setDialogFocus($('person-dialog'), $('person-name'), !p);
     $('person-dialog').showModal();
   }
@@ -325,33 +368,125 @@
       return;
     }
     const headcount = L.normalizeHeadcount($('person-headcount').value);
-    if (editingPersonId) {
-      const p = personById(editingPersonId);
-      p.name = name;
-      p.payLink = payLink;
-      p.headcount = headcount;
-    } else {
-      if (bill.people.length === 0 && payLink) {
+    const data = { name, payLink, headcount };
+    const contacts = loadContacts();
+    let id = personCtx.id;
+    if (!id) {
+      id = L.newId();
+      if (contacts.length === 0 && payLink) {
         try { localStorage.setItem(LS_MY_PAYLINK, payLink); } catch (err) { /* ignore */ }
       }
-      bill.people.push({ id: L.newId(), name, payLink, headcount });
+      contacts.push({ id, ...data });
+    } else {
+      // Keep the pool entry (if any) in sync no matter where the edit started.
+      const contact = contacts.find((c) => c.id === id);
+      if (contact) Object.assign(contact, data);
     }
+    saveContacts(contacts);
+    // Keep this bill's copy in sync too.
+    const billPerson = personById(id);
+    if (billPerson) Object.assign(billPerson, data);
+    else if (personCtx.addToBill) bill.people.push({ id, ...data });
     $('person-dialog').close();
+    if ($('picker-dialog').open) $('picker-dialog').close();
+    if ($('people-dialog').open) renderContactsList();
     saveBill();
     render();
   }
 
   function deletePerson() {
-    const id = editingPersonId;
-    const used = bill.items.some((it) => it.paidBy === id || it.sharedBy.includes(id));
-    if (used) {
-      toast('This person is on some items — edit those items first');
+    const id = personCtx.id;
+    if (personCtx.mode === 'bill') {
+      const used = bill.items.some((it) => it.paidBy === id || it.sharedBy.includes(id));
+      if (used) {
+        toast('This person is on some items — edit those items first');
+        return;
+      }
+      bill.people = bill.people.filter((p) => p.id !== id);
+      $('person-dialog').close();
+      saveBill();
+      render();
+    } else {
+      const contact = loadContacts().find((c) => c.id === id);
+      if (!confirm('Delete "' + (contact ? contact.name : '') + '" from your saved people? Existing bills are not affected.')) return;
+      saveContacts(loadContacts().filter((c) => c.id !== id));
+      $('person-dialog').close();
+      if ($('people-dialog').open) renderContactsList();
+    }
+  }
+
+  /* ---------- People picker (add pool contacts to the bill) ---------- */
+
+  function openPicker() {
+    const contacts = loadContacts();
+    if (contacts.length === 0) {
+      // Nothing to pick from yet — go straight to creating the first person.
+      openPersonDialog({ mode: 'contact', id: null, addToBill: true });
       return;
     }
-    bill.people = bill.people.filter((p) => p.id !== id);
-    $('person-dialog').close();
+    pickerSelected = new Set();
+    renderPickerList();
+    $('picker-dialog').showModal();
+  }
+
+  function renderPickerList() {
+    const wrap = $('picker-list');
+    wrap.textContent = '';
+    const inBill = new Set(bill.people.map((p) => p.id));
+    const available = loadContacts().filter((c) => !inBill.has(c.id));
+    const empty = $('picker-empty');
+    empty.classList.toggle('hidden', available.length > 0);
+    if (available.length === 0) {
+      empty.textContent = 'Everyone you saved is already on this bill. Tap "＋ New" to add someone else.';
+    }
+    for (const c of available) {
+      const chip = el('button', 'chip toggle', personLabel(c));
+      chip.type = 'button';
+      chip.setAttribute('aria-pressed', pickerSelected.has(c.id) ? 'true' : 'false');
+      chip.addEventListener('click', () => {
+        if (pickerSelected.has(c.id)) pickerSelected.delete(c.id);
+        else pickerSelected.add(c.id);
+        chip.setAttribute('aria-pressed', pickerSelected.has(c.id) ? 'true' : 'false');
+      });
+      wrap.appendChild(chip);
+    }
+  }
+
+  function pickerAdd() {
+    if (pickerSelected.size === 0) {
+      toast('Tap the people you want to add');
+      return;
+    }
+    for (const c of loadContacts()) {
+      if (pickerSelected.has(c.id)) {
+        bill.people.push({ id: c.id, name: c.name, payLink: c.payLink || '', headcount: L.normalizeHeadcount(c.headcount) });
+      }
+    }
+    $('picker-dialog').close();
     saveBill();
     render();
+  }
+
+  /* ---------- People management ---------- */
+
+  function renderContactsList() {
+    const wrap = $('contacts-list');
+    wrap.textContent = '';
+    const contacts = loadContacts();
+    if (contacts.length === 0) {
+      wrap.appendChild(el('p', 'empty-note', 'No saved people yet.'));
+      return;
+    }
+    for (const c of contacts) {
+      const row = el('button', 'history-row');
+      row.type = 'button';
+      const main = el('div', 'history-main');
+      main.appendChild(el('div', 'history-title', personLabel(c) + (c.payLink ? ' 💳' : '')));
+      main.appendChild(el('div', 'history-meta', c.payLink || 'No PayMe link'));
+      row.appendChild(main);
+      row.addEventListener('click', () => openPersonDialog({ mode: 'contact', id: c.id }));
+      wrap.appendChild(row);
+    }
   }
 
   /* ---------- Item dialog ---------- */
@@ -359,7 +494,7 @@
   function openItemDialog(itemId) {
     if (bill.people.length === 0) {
       toast('Add at least one person/family first');
-      openPersonDialog(null);
+      openPicker();
       return;
     }
     editingItemId = itemId || null;
@@ -487,7 +622,28 @@
       saveBill();
       render();
     });
-    $('btn-add-person').addEventListener('click', () => openPersonDialog(null));
+    $('btn-add-person').addEventListener('click', openPicker);
+    $('picker-new').addEventListener('click', () => openPersonDialog({ mode: 'contact', id: null, addToBill: true }));
+    $('picker-add').addEventListener('click', pickerAdd);
+    $('btn-people').addEventListener('click', () => {
+      renderContactsList();
+      $('people-dialog').showModal();
+    });
+    $('contact-new').addEventListener('click', () => openPersonDialog({ mode: 'contact', id: null }));
+    $('paylink-paste').addEventListener('click', async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        const link = L.extractPayLink(text);
+        if (!link) {
+          toast('No link found in the clipboard');
+          return;
+        }
+        $('person-paylink').value = link;
+        toast('PayMe link pasted');
+      } catch (err) {
+        toast("Couldn't read the clipboard — paste it manually");
+      }
+    });
     $('btn-add-item').addEventListener('click', () => openItemDialog(null));
     $('btn-share').addEventListener('click', openShareDialog);
     $('btn-history').addEventListener('click', () => {
@@ -537,6 +693,7 @@
   }
 
   async function init() {
+    seedContactsIfNeeded();
     await loadFromHash();
     if (!bill) {
       const bills = loadBills();

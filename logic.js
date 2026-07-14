@@ -37,6 +37,21 @@
     }
   }
 
+  /*
+   * Pull a PayMe link out of arbitrary shared text, e.g. the standard
+   * "Tap to PayMe!\nhttps://payme.hsbc/..." message. Falls back to any URL,
+   * then to the whole text if it looks like a bare link (no whitespace).
+   */
+  function extractPayLink(text) {
+    const s = String(text || '').trim();
+    if (!s) return null;
+    const match = s.match(/https:\/\/payme\.hsbc\/\S+/i) || s.match(/https?:\/\/\S+/);
+    let link = match ? match[0] : s;
+    if (!match && /\s/.test(link)) return null;
+    link = link.replace(/[.,;:!?)\]]+$/, '');
+    return link || null;
+  }
+
   // Headcount is a multiple of 0.5 (min 0.5); missing/invalid counts as 1.
   function normalizeHeadcount(value) {
     const h = typeof value === 'number' ? value : parseFloat(String(value).replace(',', '.'));
@@ -156,6 +171,7 @@
     newId,
     parseAmountToCents,
     formatMoney,
+    extractPayLink,
     normalizeHeadcount,
     computeBalances,
     settle,

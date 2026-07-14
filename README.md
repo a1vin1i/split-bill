@@ -4,7 +4,7 @@ A tiny mobile-first web app for splitting group expenses — restaurant bills, g
 
 ## How it works
 
-1. **Add people** (optionally with their PayMe PayLink, e.g. `payme.hsbc/yourname`).
+1. **Add people** from your saved pool (multi-select), or create new ones — with an optional headcount (e.g. 2 for a couple, 0.5 for a child) and PayMe PayLink (pasteable straight from the PayMe app's share message). People are saved once on your device and reusable on every bill via the 👥 manager.
 2. **Add items** — what it was, how much, who paid, and who shares it. Different items can be paid by different people and split between different subsets.
 3. **Summary** shows what everyone paid vs. their share, and the minimal set of **"who pays whom"** transfers to settle up.
 4. **Request** sends a payment request message (with the payee's PayMe link) via the share sheet / WhatsApp.

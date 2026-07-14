@@ -144,6 +144,15 @@ h3 { margin: 0 0 14px; font-size: 1.1rem; }
 .btn.danger { background: transparent; color: var(--danger); }
 .btn.whatsapp { background: var(--whatsapp); color: #fff; }
 .btn.payme { background: #db0011; color: #fff; }
+.btn.outline {
+  background: var(--bg);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  min-height: 48px;
+  padding: 6px 14px;
+  font-size: 0.9rem;
+  border-radius: 10px;
+}
 .btn.small { min-height: 44px; padding: 6px 14px; font-size: 0.9rem; border-radius: 10px; }
 .btn.big { font-size: 1.1rem; }
 .btn.full { width: 100%; }
@@ -330,6 +339,9 @@ dialog input[type="text"], dialog select {
 dialog input:focus, dialog select:focus { outline: 2px solid var(--accent); }
 
 .hint { font-size: 0.82rem; color: var(--muted); margin: 8px 0; }
+
+.input-row { display: flex; gap: 8px; margin-top: 4px; }
+dialog .input-row input[type="text"] { width: auto; flex: 1; margin-top: 0; }
 
 .stepper { display: flex; gap: 8px; margin-top: 4px; }
 .stepper button {
