@@ -143,6 +143,7 @@ h3 { margin: 0 0 14px; font-size: 1.1rem; }
 .btn.ghost { background: transparent; color: var(--muted); }
 .btn.danger { background: transparent; color: var(--danger); }
 .btn.whatsapp { background: var(--whatsapp); color: #fff; }
+.btn.payme { background: #db0011; color: #fff; }
 .btn.small { min-height: 44px; padding: 6px 14px; font-size: 0.9rem; border-radius: 10px; }
 .btn.big { font-size: 1.1rem; }
 .btn.full { width: 100%; }
@@ -229,11 +230,13 @@ h3 { margin: 0 0 14px; font-size: 1.1rem; }
   box-shadow: var(--shadow);
 }
 .summary-table th, .summary-table td {
-  padding: 11px 12px;
+  padding: 10px 7px;
   text-align: right;
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   border-bottom: 1px solid var(--border);
 }
+.summary-table th:first-child, .summary-table td:first-child { padding-left: 12px; }
+.summary-table th:last-child, .summary-table td:last-child { padding-right: 12px; }
 .summary-table tr:last-child td { border-bottom: none; }
 .summary-table th:first-child, .summary-table td:first-child {
   text-align: left;
@@ -244,11 +247,15 @@ h3 { margin: 0 0 14px; font-size: 1.1rem; }
   white-space: nowrap;
 }
 .summary-table th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; }
+.summary-table th:first-child { white-space: normal; }
+
+.table-scroll { overflow-x: auto; border-radius: var(--radius); }
 .net-pos { color: var(--pos); font-weight: 700; }
 .net-neg { color: var(--neg); font-weight: 700; }
 
 .transfer-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   padding: 12px 14px;
@@ -258,7 +265,8 @@ h3 { margin: 0 0 14px; font-size: 1.1rem; }
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
-.transfer-who { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.transfer-who { flex: 1 1 auto; min-width: 45%; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.transfer-actions { display: flex; gap: 8px; margin-left: auto; }
 .transfer-who .arr { color: var(--accent); margin: 0 4px; }
 .transfer-amount { font-weight: 700; white-space: nowrap; }
 .transfer-hint { font-size: 0.8rem; color: var(--muted); margin: -4px 2px 10px; }

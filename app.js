@@ -198,7 +198,7 @@
     const table = el('table', 'summary-table');
     const thead = el('thead');
     const hr = el('tr');
-    for (const h of ['Person/Family', 'Paid', 'Share', 'Net']) hr.appendChild(el('th', '', h));
+    for (const h of ['Person / Family', 'Paid', 'Share', 'Net']) hr.appendChild(el('th', '', h));
     thead.appendChild(hr);
     table.appendChild(thead);
     const tbody = el('tbody');
@@ -214,7 +214,9 @@
       tbody.appendChild(tr);
     }
     table.appendChild(tbody);
-    summary.appendChild(table);
+    const scroller = el('div', 'table-scroll');
+    scroller.appendChild(table);
+    summary.appendChild(scroller);
 
     const transfers = L.settle(balances);
     if (transfers.length === 0) {
@@ -230,14 +232,24 @@
       who.appendChild(document.createTextNode(personName(t.to)));
       row.appendChild(who);
       row.appendChild(el('div', 'transfer-amount', fmt(t.amountCents)));
+      const actions = el('div', 'transfer-actions');
       const btn = el('button', 'btn small primary', 'Request');
       btn.type = 'button';
       btn.addEventListener('click', () => requestPayment(t));
-      row.appendChild(btn);
-      transfersWrap.appendChild(row);
+      actions.appendChild(btn);
 
       const payee = personById(t.to);
-      if (payee && !payee.payLink) missingPayLink.add(payee.name);
+      if (payee && payee.payLink) {
+        const payBtn = el('a', 'btn small payme', 'PayMe');
+        payBtn.href = normalizePayLink(payee.payLink);
+        payBtn.target = '_blank';
+        payBtn.rel = 'noopener';
+        actions.appendChild(payBtn);
+      } else if (payee) {
+        missingPayLink.add(payee.name);
+      }
+      row.appendChild(actions);
+      transfersWrap.appendChild(row);
     }
     if (missingPayLink.size > 0) {
       const names = [...missingPayLink].map((n) => '"' + n + '"').join(', ');
