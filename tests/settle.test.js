@@ -96,6 +96,50 @@ test('single payer, others owe them', () => {
   }
 });
 
+test('normalizeHeadcount', () => {
+  assert.strictEqual(L.normalizeHeadcount(2), 2);
+  assert.strictEqual(L.normalizeHeadcount('2.5'), 2.5);
+  assert.strictEqual(L.normalizeHeadcount('0,5'), 0.5); // comma decimal
+  assert.strictEqual(L.normalizeHeadcount(0.7), 0.5); // rounds to nearest 0.5
+  assert.strictEqual(L.normalizeHeadcount(0.1), 0.5); // clamps to minimum
+  assert.strictEqual(L.normalizeHeadcount(undefined), 1); // missing -> 1
+  assert.strictEqual(L.normalizeHeadcount('abc'), 1);
+  assert.strictEqual(L.normalizeHeadcount(-3), 1);
+});
+
+test('split is weighted by headcount', () => {
+  const family = { id: 'f', name: 'Chans', payLink: '', headcount: 2 };
+  const single = { id: 's', name: 'Bob', payLink: '', headcount: 1 };
+  const bill = makeBill([family, single], [
+    { id: 'i1', desc: 'x', amountCents: 30000, paidBy: 's', sharedBy: ['f', 's'] },
+  ]);
+  const bal = L.computeBalances(bill);
+  assert.strictEqual(bal.f.owedCents, 20000); // 2 of 3 shares
+  assert.strictEqual(bal.s.owedCents, 10000); // 1 of 3 shares
+});
+
+test('half headcount and remainder cents still reconcile exactly', () => {
+  const child = { id: 'k', name: 'Kid', payLink: '', headcount: 0.5 };
+  const adult = { id: 'a', name: 'Alvin', payLink: '', headcount: 1 };
+  const bill = makeBill([child, adult], [
+    { id: 'i1', desc: 'x', amountCents: 100, paidBy: 'a', sharedBy: ['k', 'a'] },
+  ]);
+  const bal = L.computeBalances(bill);
+  // 1 of 3 units = 33.33 -> floor 33, remainder cent goes to first sharer
+  assert.strictEqual(bal.k.owedCents, 34);
+  assert.strictEqual(bal.a.owedCents, 66);
+  assert.strictEqual(bal.k.owedCents + bal.a.owedCents, 100);
+});
+
+test('people without headcount default to 1 (old bills keep working)', () => {
+  const bill = makeBill([A, B], [
+    { id: 'i1', desc: 'x', amountCents: 1000, paidBy: 'a', sharedBy: ['a', 'b'] },
+  ]);
+  const bal = L.computeBalances(bill);
+  assert.strictEqual(bal.a.owedCents, 500);
+  assert.strictEqual(bal.b.owedCents, 500);
+});
+
 test('items referencing unknown people are ignored gracefully', () => {
   const bill = makeBill([A, B], [
     { id: 'i1', desc: 'x', amountCents: 1000, paidBy: 'ghost', sharedBy: ['ghost', 'a'] },

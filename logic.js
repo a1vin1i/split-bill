@@ -37,26 +37,38 @@
     }
   }
 
+  // Headcount is a multiple of 0.5 (min 0.5); missing/invalid counts as 1.
+  function normalizeHeadcount(value) {
+    const h = typeof value === 'number' ? value : parseFloat(String(value).replace(',', '.'));
+    if (!isFinite(h) || h <= 0) return 1;
+    return Math.max(0.5, Math.round(h * 2) / 2);
+  }
+
   /*
-   * Per-person totals. Each sharer owes floor(amount/n); leftover cents go
-   * one each to the earliest sharers (item order) so every item reconciles
-   * exactly. Returns { personId: { paidCents, owedCents, netCents } }.
+   * Per-person totals, weighted by headcount. Each sharer owes
+   * floor(amount * headcount / totalHeadcount) — computed in half-person
+   * units so the math stays integer — and leftover cents go one each to the
+   * earliest sharers (item order) so every item reconciles exactly.
+   * Returns { personId: { paidCents, owedCents, netCents } }.
    */
   function computeBalances(bill) {
     const balances = {};
+    const unitsById = {};
     for (const p of bill.people) {
       balances[p.id] = { paidCents: 0, owedCents: 0, netCents: 0 };
+      unitsById[p.id] = Math.round(normalizeHeadcount(p.headcount) * 2);
     }
     for (const item of bill.items) {
       if (balances[item.paidBy]) balances[item.paidBy].paidCents += item.amountCents;
       const sharers = item.sharedBy.filter((id) => balances[id]);
       if (sharers.length === 0) continue;
-      const base = Math.floor(item.amountCents / sharers.length);
-      let remainder = item.amountCents - base * sharers.length;
-      for (const id of sharers) {
-        balances[id].owedCents += base + (remainder > 0 ? 1 : 0);
+      const totalUnits = sharers.reduce((sum, id) => sum + unitsById[id], 0);
+      const shares = sharers.map((id) => Math.floor((item.amountCents * unitsById[id]) / totalUnits));
+      let remainder = item.amountCents - shares.reduce((sum, s) => sum + s, 0);
+      sharers.forEach((id, i) => {
+        balances[id].owedCents += shares[i] + (remainder > 0 ? 1 : 0);
         if (remainder > 0) remainder--;
-      }
+      });
     }
     for (const id in balances) {
       balances[id].netCents = balances[id].paidCents - balances[id].owedCents;
@@ -144,6 +156,7 @@
     newId,
     parseAmountToCents,
     formatMoney,
+    normalizeHeadcount,
     computeBalances,
     settle,
     encodeBill,

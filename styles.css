@@ -323,6 +323,24 @@ dialog input:focus, dialog select:focus { outline: 2px solid var(--accent); }
 
 .hint { font-size: 0.82rem; color: var(--muted); margin: 8px 0; }
 
+.stepper { display: flex; gap: 8px; margin-top: 4px; }
+.stepper button {
+  min-width: 52px;
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--accent);
+  font-size: 1.35rem;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.stepper button:active { background: var(--accent-soft); }
+dialog .stepper input[type="text"] { width: auto; flex: 1; text-align: center; margin-top: 0; }
+
+dialog h3:focus { outline: none; }
+
 .dialog-actions {
   display: flex;
   align-items: center;

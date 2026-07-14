@@ -68,6 +68,33 @@
     return p ? p.name : '?';
   }
 
+  function headcountOf(p) {
+    return L.normalizeHeadcount(p.headcount);
+  }
+
+  function formatHeadcount(h) {
+    return h % 1 === 0 ? String(h) : h.toFixed(1);
+  }
+
+  // "Bob" for a single person, "Chans ×2.5" for a family.
+  function personLabel(p) {
+    const h = headcountOf(p);
+    return h === 1 ? p.name : p.name + ' ×' + formatHeadcount(h);
+  }
+
+  // Move `autofocus` so showModal() focuses the first input only when adding;
+  // when editing, the dialog heading takes focus and no keyboard pops up.
+  function setDialogFocus(dialog, firstInput, isNew) {
+    const heading = dialog.querySelector('h3');
+    if (isNew) {
+      heading.removeAttribute('autofocus');
+      firstInput.setAttribute('autofocus', '');
+    } else {
+      firstInput.removeAttribute('autofocus');
+      heading.setAttribute('autofocus', '');
+    }
+  }
+
   function normalizePayLink(link) {
     if (!link) return '';
     link = link.trim();
@@ -118,7 +145,7 @@
     const wrap = $('people-list');
     wrap.textContent = '';
     for (const p of bill.people) {
-      const chip = el('button', 'chip', p.name);
+      const chip = el('button', 'chip', personLabel(p));
       chip.type = 'button';
       if (p.payLink) chip.appendChild(el('span', 'paylink-mark', '💳'));
       chip.addEventListener('click', () => openPersonDialog(p.id));
@@ -139,7 +166,12 @@
       const main = el('div', 'item-main');
       main.appendChild(el('div', 'item-desc', item.desc));
       const n = item.sharedBy.length;
-      const meta = 'Paid by ' + personName(item.paidBy) + ' · split ' + (n === 1 ? 'by 1 person' : n + ' ways');
+      const heads = item.sharedBy.reduce((sum, id) => {
+        const p = personById(id);
+        return p ? sum + headcountOf(p) : sum;
+      }, 0);
+      let meta = 'Paid by ' + personName(item.paidBy) + ' · split ' + (n === 1 ? 'by 1' : n + ' ways');
+      if (heads !== n) meta += ' (' + formatHeadcount(heads) + ' shares)';
       main.appendChild(el('div', 'item-meta', meta));
       card.appendChild(main);
       card.appendChild(el('div', 'item-amount', fmt(item.amountCents)));
@@ -166,7 +198,7 @@
     const table = el('table', 'summary-table');
     const thead = el('thead');
     const hr = el('tr');
-    for (const h of ['Person', 'Paid', 'Share', 'Net']) hr.appendChild(el('th', '', h));
+    for (const h of ['Person/Family', 'Paid', 'Share', 'Net']) hr.appendChild(el('th', '', h));
     thead.appendChild(hr);
     table.appendChild(thead);
     const tbody = el('tbody');
@@ -189,6 +221,7 @@
       transfersWrap.appendChild(el('div', 'all-settled', 'All settled — nobody owes anything 🎉'));
       return;
     }
+    const missingPayLink = new Set();
     for (const t of transfers) {
       const row = el('div', 'transfer-row');
       const who = el('div', 'transfer-who');
@@ -204,10 +237,12 @@
       transfersWrap.appendChild(row);
 
       const payee = personById(t.to);
-      if (payee && !payee.payLink) {
-        transfersWrap.appendChild(el('p', 'transfer-hint',
-          'Tip: tap "' + payee.name + '" above and add their PayMe link to include it in the request.'));
-      }
+      if (payee && !payee.payLink) missingPayLink.add(payee.name);
+    }
+    if (missingPayLink.size > 0) {
+      const names = [...missingPayLink].map((n) => '"' + n + '"').join(', ');
+      transfersWrap.appendChild(el('p', 'transfer-hint',
+        'Tip: tap ' + names + ' above and add their PayMe link to include it in requests.'));
     }
   }
 
@@ -252,14 +287,21 @@
   function openPersonDialog(personId) {
     editingPersonId = personId || null;
     const p = personId ? personById(personId) : null;
-    $('person-dialog-heading').textContent = p ? 'Edit person' : 'Add person';
+    $('person-dialog-heading').textContent = p ? 'Edit person/family' : 'Add person/family';
     $('person-name').value = p ? p.name : '';
+    $('person-headcount').value = formatHeadcount(p ? headcountOf(p) : 1);
     // First person on this device: prefill their remembered PayLink.
     const prefill = !p && bill.people.length === 0 ? localStorage.getItem(LS_MY_PAYLINK) || '' : '';
     $('person-paylink').value = p ? p.payLink || '' : prefill;
     $('person-delete').classList.toggle('hidden', !p);
+    setDialogFocus($('person-dialog'), $('person-name'), !p);
     $('person-dialog').showModal();
-    if (!p) $('person-name').focus();
+  }
+
+  function stepHeadcount(delta) {
+    const input = $('person-headcount');
+    const h = Math.max(0.5, L.normalizeHeadcount(input.value) + delta);
+    input.value = formatHeadcount(h);
   }
 
   function savePerson(e) {
@@ -270,15 +312,17 @@
       toast('Please enter a name');
       return;
     }
+    const headcount = L.normalizeHeadcount($('person-headcount').value);
     if (editingPersonId) {
       const p = personById(editingPersonId);
       p.name = name;
       p.payLink = payLink;
+      p.headcount = headcount;
     } else {
       if (bill.people.length === 0 && payLink) {
         try { localStorage.setItem(LS_MY_PAYLINK, payLink); } catch (err) { /* ignore */ }
       }
-      bill.people.push({ id: L.newId(), name, payLink });
+      bill.people.push({ id: L.newId(), name, payLink, headcount });
     }
     $('person-dialog').close();
     saveBill();
@@ -302,7 +346,7 @@
 
   function openItemDialog(itemId) {
     if (bill.people.length === 0) {
-      toast('Add at least one person first');
+      toast('Add at least one person/family first');
       openPersonDialog(null);
       return;
     }
@@ -321,15 +365,15 @@
     dialogShared = new Set(item ? item.sharedBy : bill.people.map((p) => p.id));
     renderSharedChips();
 
+    setDialogFocus($('item-dialog'), $('item-amount'), !item);
     $('item-dialog').showModal();
-    if (!item) $('item-desc').focus();
   }
 
   function renderSharedChips() {
     const wrap = $('item-sharedby');
     wrap.textContent = '';
     for (const p of bill.people) {
-      const chip = el('button', 'chip toggle', p.name);
+      const chip = el('button', 'chip toggle', personLabel(p));
       chip.type = 'button';
       chip.setAttribute('aria-pressed', dialogShared.has(p.id) ? 'true' : 'false');
       chip.addEventListener('click', () => {
@@ -446,6 +490,8 @@
     });
     $('person-form').addEventListener('submit', savePerson);
     $('person-delete').addEventListener('click', deletePerson);
+    $('headcount-minus').addEventListener('click', () => stepHeadcount(-0.5));
+    $('headcount-plus').addEventListener('click', () => stepHeadcount(0.5));
     $('item-form').addEventListener('submit', saveItem);
     $('item-delete').addEventListener('click', deleteItem);
 

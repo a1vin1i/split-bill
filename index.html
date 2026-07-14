@@ -30,7 +30,7 @@
   <section>
     <h2>People</h2>
     <div id="people-list" class="chips"></div>
-    <button id="btn-add-person" class="btn secondary full">＋ Add person</button>
+    <button id="btn-add-person" class="btn secondary full">＋ Add person/family</button>
   </section>
 
   <section>
@@ -53,10 +53,18 @@
 
 <dialog id="person-dialog">
   <form id="person-form" novalidate>
-    <h3 id="person-dialog-heading">Add person</h3>
+    <h3 id="person-dialog-heading" tabindex="-1">Add person/family</h3>
     <label>Name
       <input id="person-name" type="text" autocomplete="off" placeholder="e.g. Alvin">
     </label>
+    <label>Headcount
+      <div class="stepper">
+        <button type="button" id="headcount-minus" aria-label="Decrease headcount">−</button>
+        <input id="person-headcount" type="text" autocomplete="off" inputmode="decimal" value="1">
+        <button type="button" id="headcount-plus" aria-label="Increase headcount">＋</button>
+      </div>
+    </label>
+    <p class="hint">How many shares this person/family counts as — e.g. 2 for a couple, 0.5 for a child or half share.</p>
     <label>PayMe link <span class="optional">(optional)</span>
       <input id="person-paylink" type="text" autocomplete="off" placeholder="payme.hsbc/yourname" inputmode="url">
     </label>
@@ -72,12 +80,12 @@
 
 <dialog id="item-dialog">
   <form id="item-form" novalidate>
-    <h3 id="item-dialog-heading">Add item</h3>
-    <label>Description
-      <input id="item-desc" type="text" autocomplete="off" placeholder="e.g. Dinner">
-    </label>
+    <h3 id="item-dialog-heading" tabindex="-1">Add item</h3>
     <label>Amount
       <input id="item-amount" type="text" autocomplete="off" inputmode="decimal" placeholder="0.00">
+    </label>
+    <label>Description
+      <input id="item-desc" type="text" autocomplete="off" placeholder="e.g. Dinner">
     </label>
     <label for="item-paidby">Paid by</label>
     <select id="item-paidby"></select>
